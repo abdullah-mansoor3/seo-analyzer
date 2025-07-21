@@ -1,17 +1,16 @@
-
 version: '3.8'
 
 services:
   backend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile
     ports:
       - '8000:8000'
     volumes:
-      - .:/app
+      - ../:/app
     env_file:
-      - .env
+      - ../.env
 
   ollama:
     image: ollama/ollama
@@ -22,4 +21,3 @@ services:
 
 volumes:
   ollama_data:
-
