@@ -29,5 +29,5 @@ jobs:
         file: ./docker/Dockerfile  # ✅ tell it where your Dockerfile actually is
         push: true
         tags: |
-          abdullahmansoor/seo-analyzer-backend:latest
-          abdullahmansoor/seo-analyzer-backend:${{ github.ref_name }}
+          abdullahmansoor3/seo-analyzer-backend:latest
+          abdullahmansoor3/seo-analyzer-backend:${{ github.ref_name }}
