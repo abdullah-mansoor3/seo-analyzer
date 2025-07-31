@@ -1,8 +1,45 @@
-
+# Python
 *__pycache__/
-*.venv/
-*.env
-*env/
-*data/
-*.vscode
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pkl
+*.db
+*.sqlite3
+*.egg-info/
 
+# Virtual environments
+*.venv/
+*venv/
+*env/
+*.env
+
+# Jupyter
+*.ipynb_checkpoints/
+
+# IDEs
+*.vscode/
+
+# Logs and temp
+*.log
+*.tmp
+*.swp
+
+# Backend data or cache
+*data/
+*cache/
+*__output__/
+
+# Node.js / Frontend
+*node_modules/
+*dist/
+*.vite/
+*.next/
+
+# Optional: if using Tailwind or PostCSS cache
+frontend/.tailwindcache/
+
+# Reports or generated PDFs
+*reports/
+*.pdf
