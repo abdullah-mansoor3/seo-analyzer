@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
-from backend.apis.crawler_api import router as crawler_router
+from backend.apis.seo_analyzer_api import router as crawler_router
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
