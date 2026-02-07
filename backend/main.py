@@ -1,22 +1,24 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
-from backend.apis.seo_analyzer_api import router as crawler_router
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.apis.seo_analyzer_api import router as seo_router
+
 load_dotenv()
-app = FastAPI()
 
-@app.get('/')
-def read_root():
-    return {'message': 'SEO Analyzer API'}
-
-app.include_router(crawler_router)
-
+app = FastAPI(title="SEO Analyzer API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or ["http://localhost:5173"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(seo_router)
+
+
+@app.get("/")
+def health_check():
+    return {"status": "ok", "service": "SEO Analyzer API"}

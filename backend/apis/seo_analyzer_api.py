@@ -1,59 +1,49 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 from urllib.parse import urlparse
-import os
 
-# Import project modules
-from backend.crawler import crawl_site, save_results
-from backend.rules_engine import run_quick_checks
-from backend.embeddings import embed_documents, build_faiss_index
-from backend.rag_engine import rag_query
+from backend.crawler import crawl_site
+from backend.rules_engine import run_rules_checks
 from backend.report_generator import generate_report
 
 router = APIRouter()
 
+DEFAULT_QUERY = (
+    "Analyse this website's SEO in depth. For every page you have data on, "
+    "list the specific issues, explain why each matters, and give an exact "
+    "actionable fix. Prioritise by traffic impact. End with an overall score "
+    "out of 10 and a summary paragraph."
+)
+
+
 class AnalyzeRequest(BaseModel):
     url: HttpUrl
-    query: str = "Give me details suggestions for improving SEO for the site. I'm giving you the metadata. Give me in depth details on exactly what to improve and in what page."
+    query: str = DEFAULT_QUERY
 
 
-@router.post("/analyze/")
+@router.post("/analyze")
 def analyze_site(request: AnalyzeRequest):
     try:
         url = str(request.url)
-        domain = urlparse(url).netloc
 
         # 1. Crawl site
         pages = crawl_site(url)
         if not pages:
-            raise HTTPException(status_code=400, detail="No pages crawled")
+            raise HTTPException(status_code=400, detail="No pages could be crawled from this URL.")
 
-        # 2. Run rules engine checks
-        quick_checks = run_quick_checks(pages)
+        # 2. Rule-based SEO checks
+        rules = run_rules_checks(pages)
 
-        # 3. Prepare docs (pages + quick checks)
-        documents = []
-        for p in pages:
-            documents.append({"source": p["url"], "text": p["content"]})
-        documents.append({"source": "rules_engine", "text": str(quick_checks)})
-
-        # 4. Build embeddings + FAISS index
-        embeddings, index = build_faiss_index(documents)
-
-        # 5. Run RAG query
-        rag_output = rag_query(request.query, embeddings, index, documents)
-
-        # 6. Generate SEO report
-        report = generate_report(pages, quick_checks, rag_output)
+        # 3. Build knowledge base + RAG analysis via Groq
+        report = generate_report(pages, rules, request.query)
 
         return {
             "status": "success",
             "pages_crawled": len(pages),
-            "quick_checks": quick_checks,
-            "rag_output": rag_output,
             "report": report,
-            "saved_to": f"data/sites/{domain}/crawl.json"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SEO analysis failed: {str(e)}")

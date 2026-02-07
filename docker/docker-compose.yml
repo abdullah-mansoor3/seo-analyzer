@@ -7,19 +7,6 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - '8000:8000'
-    volumes:
-      - ../backend:/app  # consider narrowing to ../backend:/app if needed
     env_file:
       - ../.env
     restart: unless-stopped
-
-  ollama:
-    image: ollama/ollama
-    ports:
-      - '11434:11434'
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-
-volumes:
-  ollama_data:

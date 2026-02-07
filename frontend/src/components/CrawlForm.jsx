@@ -1,75 +1,165 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Loader from './Loader';
+
+// Lightweight markdown-to-HTML (handles headings, bold, lists, code, blockquotes)
+function renderMarkdown(md) {
+  if (!md) return '';
+  let html = md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br/>');
+  return `<p>${html}</p>`;
+}
 
 export default function CrawlForm() {
   const [url, setUrl] = useState('');
-  const [status, setStatus] = useState({ loading: false, message: null, ok: null, data: null });
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(0);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('ai');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!url) return;
-    setStatus({ loading: true, message: 'Crawling…', ok: null, data: null });
+
+    setLoading(true);
+    setResult(null);
+    setError(null);
+    setStep(0);
+
+    // Simulate step progression while waiting for backend
+    const stepTimer = setInterval(() => {
+      setStep((s) => (s < 3 ? s + 1 : s));
+    }, 3000);
 
     try {
-      const response = await fetch('http://localhost:8000/crawl', {
+      const res = await fetch('http://localhost:8000/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        setStatus({ loading: false, message: 'Crawl complete', ok: true, data });
+      clearInterval(stepTimer);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail || 'Analysis failed');
       } else {
-        setStatus({ loading: false, message: data.detail || 'Crawl failed', ok: false, data });
+        setStep(4);
+        setResult(data);
       }
     } catch (err) {
-      setStatus({ loading: false, message: `Network error: ${err.message}`, ok: false, data: null });
+      clearInterval(stepTimer);
+      setError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [url]);
+
+  const checks = result?.report?.rules_summary?.checks || [];
+  const totalIssues = checks.reduce((n, c) => n + (c.issues?.length || 0), 0);
+  const cleanPages = checks.filter((c) => !c.issues?.length).length;
+  const aiMarkdown = result?.report?.ai_analysis || '';
 
   return (
-    <div className="card glass-card">
-      <form className="crawl-form" onSubmit={handleSubmit} aria-label="Crawl website form">
-        <label htmlFor="url" className="visually-hidden">Website URL</label>
+    <>
+      <form className="crawl-form" onSubmit={handleSubmit} aria-label="Analyze website">
         <input
-          id="url"
-          name="url"
           type="url"
+          className="input"
           placeholder="https://example.com"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           required
-          className="input"
-          aria-required="true"
+          disabled={loading}
         />
-
-        <button className={`btn primary ${status.loading ? 'loading' : ''}`} type="submit" disabled={status.loading}>
-          {status.loading ? <span className="btn-spinner" aria-hidden /> : 'Analyze'}
+        <button className="btn primary" type="submit" disabled={loading}>
+          {loading ? 'Analyzing…' : 'Analyze'}
         </button>
       </form>
 
-      <div className="status-area">
-        {status.loading && (
-          <div className="status-row">
-            <Loader size={32} />
-            <div className="status-text">Analyzing <strong>{url || 'website'}</strong> — this can take a few seconds</div>
-          </div>
-        )}
+      {loading && <Loader currentStep={step} />}
 
-        {!status.loading && status.message && (
-          <div className={`result ${status.ok ? 'ok' : 'error'}`}>
-            <div className="result-header">
-              <strong>{status.ok ? 'Success' : 'Error'}</strong>
-              <span className="result-message"> — {status.message}</span>
+      {error && !loading && (
+        <div className="error-card">
+          <strong>Error</strong> — {error}
+        </div>
+      )}
+
+      {result && !loading && (
+        <div className="results-section">
+          {/* Stats bar */}
+          <div className="stats-bar">
+            <div className="stat-card">
+              <div className="stat-value">{result.pages_crawled}</div>
+              <div className="stat-label">Pages Crawled</div>
             </div>
-
-            {status.data && (
-              <pre className="result-body" aria-live="polite">{JSON.stringify(status.data, null, 2)}</pre>
-            )}
+            <div className="stat-card">
+              <div className="stat-value">{totalIssues}</div>
+              <div className="stat-label">Issues Found</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{cleanPages}</div>
+              <div className="stat-label">Clean Pages</div>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+
+          {/* Tabs */}
+          <div className="tabs">
+            <button
+              className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ai')}
+            >
+              AI Analysis
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'checks' ? 'active' : ''}`}
+              onClick={() => setActiveTab('checks')}
+            >
+              Rule Checks ({checks.length})
+            </button>
+          </div>
+
+          {/* AI tab */}
+          {activeTab === 'ai' && (
+            <div
+              className="ai-analysis"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(aiMarkdown) }}
+            />
+          )}
+
+          {/* Rule checks tab */}
+          {activeTab === 'checks' && (
+            <div className="checks-list">
+              {checks.map((check, i) => (
+                <div className="check-card" key={i} style={{ animationDelay: `${i * .06}s` }}>
+                  <div className="check-url">{check.page}</div>
+                  {check.issues?.length ? (
+                    <ul className="issue-list">
+                      {check.issues.map((issue, j) => (
+                        <li className="issue-item" key={j} style={{ animationDelay: `${(i * .06) + (j * .04)}s` }}>
+                          {issue}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="check-pass">✓ No issues found</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
